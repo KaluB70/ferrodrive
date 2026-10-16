@@ -1,10 +1,10 @@
-//! Windows detection: SetupAPI for devices and drivers, SMBIOS firmware table
+//! Windows detection: the configuration manager (CfgMgr32) for devices and drivers, SMBIOS firmware table
 //! for BIOS and system identity. Plain Win32 calls, no WMI.
 
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
-    DIGCF_ALLCLASSES, DIGCF_PRESENT, HDEVINFO, SP_DEVINFO_DATA, SetupDiDestroyDeviceInfoList,
-    SetupDiEnumDeviceInfo, SetupDiGetClassDevsW, SetupDiGetDeviceInstanceIdW,
-    SetupDiGetDevicePropertyW,
+    CM_GETIDLIST_FILTER_PRESENT, CM_Get_DevNode_PropertyW, CM_Get_Device_ID_List_SizeW,
+    CM_Get_Device_ID_ListW, CM_LOCATE_DEVNODE_NORMAL, CM_Locate_DevNodeW, CR_BUFFER_SMALL,
+    CR_SUCCESS,
 };
 use windows::Win32::Devices::Properties::{
     DEVPKEY_Device_Class, DEVPKEY_Device_DeviceDesc, DEVPKEY_Device_DriverDate,
@@ -12,7 +12,7 @@ use windows::Win32::Devices::Properties::{
     DEVPKEY_Device_FriendlyName, DEVPKEY_Device_HardwareIds, DEVPKEY_Device_Manufacturer,
     DEVPROPTYPE,
 };
-use windows::Win32::Foundation::{DEVPROPKEY, ERROR_NO_MORE_ITEMS};
+use windows::Win32::Foundation::DEVPROPKEY;
 use windows::Win32::System::SystemInformation::{GetSystemFirmwareTable, RSMB};
 use windows::core::PCWSTR;
 
@@ -24,13 +24,16 @@ use crate::smbios;
 const RAW_SMBIOS_HEADER: usize = 8;
 
 pub fn scan() -> Result<Scan, Error> {
-    let (system, firmware) = smbios_table()
-        .map(|t| smbios::parse(&t))
-        .unwrap_or_default();
+    let (system, firmware) = super::timed("smbios", || {
+        smbios_table()
+            .map(|t| smbios::parse(&t))
+            .unwrap_or_default()
+    });
+    let devices = super::timed("devices", devices)?;
     Ok(Scan {
         system,
         firmware,
-        devices: devices()?,
+        devices,
     })
 }
 
@@ -51,87 +54,111 @@ fn smbios_table() -> Option<Vec<u8>> {
     Some(buffer)
 }
 
-/// Owns a SetupAPI device information set and frees it on drop.
-struct DeviceInfoSet(HDEVINFO);
-
-impl Drop for DeviceInfoSet {
-    fn drop(&mut self) {
-        // SAFETY: the handle came from SetupDiGetClassDevsW and is freed exactly once.
-        let _ = unsafe { SetupDiDestroyDeviceInfoList(self.0) };
-    }
-}
-
 fn devices() -> Result<Vec<Device>, Error> {
-    // SAFETY: all-classes query of present devices; the handle is owned by `DeviceInfoSet`.
-    let set = DeviceInfoSet(unsafe {
-        SetupDiGetClassDevsW(None, PCWSTR::null(), None, DIGCF_ALLCLASSES | DIGCF_PRESENT)?
-    });
-
-    let mut devices = Vec::new();
-    for index in 0.. {
-        let mut info = SP_DEVINFO_DATA {
-            cbSize: size_of::<SP_DEVINFO_DATA>() as u32,
-            ..Default::default()
+    let ids = device_ids()?;
+    let mut buffer = vec![0u8; 4096];
+    let mut devices = Vec::with_capacity(ids.len());
+    for id in ids {
+        let mut devnode = 0u32;
+        let id_wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+        // SAFETY: `id_wide` is a NUL-terminated device instance id.
+        let located = unsafe {
+            CM_Locate_DevNodeW(
+                &mut devnode,
+                PCWSTR(id_wide.as_ptr()),
+                CM_LOCATE_DEVNODE_NORMAL,
+            )
         };
-        // SAFETY: `info` is a correctly sized SP_DEVINFO_DATA owned by this frame.
-        match unsafe { SetupDiEnumDeviceInfo(set.0, index, &mut info) } {
-            Ok(()) => {}
-            Err(e) if e.code() == ERROR_NO_MORE_ITEMS.to_hresult() => break,
-            Err(e) => return Err(e.into()),
+        if located == CR_SUCCESS {
+            devices.push(device(devnode, id, &mut buffer));
         }
-        devices.push(device(&set, &info));
     }
     Ok(devices)
 }
 
-fn device(set: &DeviceInfoSet, info: &SP_DEVINFO_DATA) -> Device {
-    let string =
-        |key| property(set, info, key).map(|raw| wide_strings(&raw).next().unwrap_or_default());
-    let string = |key| string(key).filter(|s: &String| !s.is_empty());
+/// Instance ids of all present devices, in one call to the configuration manager.
+fn device_ids() -> Result<Vec<String>, Error> {
+    let flags = CM_GETIDLIST_FILTER_PRESENT;
+    loop {
+        let mut len = 0u32;
+        // SAFETY: size query for the multi-string list.
+        let cr = unsafe { CM_Get_Device_ID_List_SizeW(&mut len, PCWSTR::null(), flags) };
+        if cr != CR_SUCCESS {
+            return Err(Error::ConfigManager(cr.0));
+        }
+        let mut list = vec![0u16; len as usize];
+        // SAFETY: `list` has the size the previous call reported.
+        match unsafe { CM_Get_Device_ID_ListW(PCWSTR::null(), &mut list, flags) } {
+            CR_SUCCESS => {
+                return Ok(list
+                    .split(|&c| c == 0)
+                    .filter(|s| !s.is_empty())
+                    .map(String::from_utf16_lossy)
+                    .collect());
+            }
+            // A device arrived between the two calls; ask for the size again.
+            CR_BUFFER_SMALL => continue,
+            cr => return Err(Error::ConfigManager(cr.0)),
+        }
+    }
+}
+
+fn device(devnode: u32, instance_id: String, buffer: &mut Vec<u8>) -> Device {
+    let mut string = |key| {
+        property(devnode, key, buffer)
+            .and_then(|raw| wide_strings(raw).next())
+            .filter(|s| !s.is_empty())
+    };
 
     let version = string(&DEVPKEY_Device_DriverVersion);
-    let driver = version.is_some().then(|| Driver {
-        version,
-        date: property(set, info, &DEVPKEY_Device_DriverDate)
-            .and_then(|raw| filetime_to_date(&raw)),
-        provider: string(&DEVPKEY_Device_DriverProvider),
-        package: string(&DEVPKEY_Device_DriverInfPath),
-    });
+    let provider = string(&DEVPKEY_Device_DriverProvider);
+    let package = string(&DEVPKEY_Device_DriverInfPath);
+    let name = string(&DEVPKEY_Device_FriendlyName).or_else(|| string(&DEVPKEY_Device_DeviceDesc));
+    let class = string(&DEVPKEY_Device_Class);
+    let manufacturer = string(&DEVPKEY_Device_Manufacturer);
+    let date = property(devnode, &DEVPKEY_Device_DriverDate, buffer).and_then(filetime_to_date);
+    let hardware_ids = property(devnode, &DEVPKEY_Device_HardwareIds, buffer)
+        .map(|raw| wide_strings(raw).collect())
+        .unwrap_or_default();
 
     Device {
-        instance_id: instance_id(set, info).unwrap_or_default(),
-        name: string(&DEVPKEY_Device_FriendlyName).or_else(|| string(&DEVPKEY_Device_DeviceDesc)),
-        class: string(&DEVPKEY_Device_Class),
-        manufacturer: string(&DEVPKEY_Device_Manufacturer),
-        hardware_ids: property(set, info, &DEVPKEY_Device_HardwareIds)
-            .map(|raw| wide_strings(&raw).collect())
-            .unwrap_or_default(),
-        driver,
+        instance_id,
+        name,
+        class,
+        manufacturer,
+        hardware_ids,
+        driver: version.is_some().then_some(Driver {
+            version,
+            date,
+            provider,
+            package,
+        }),
     }
 }
 
-/// Reads a device property as raw bytes; `None` when the device doesn't have it.
-fn property(set: &DeviceInfoSet, info: &SP_DEVINFO_DATA, key: &DEVPROPKEY) -> Option<Vec<u8>> {
-    let mut kind = DEVPROPTYPE::default();
-    let mut size = 0u32;
-    // SAFETY: size query (fails with ERROR_INSUFFICIENT_BUFFER), then a read into a buffer of that size.
-    let _ =
-        unsafe { SetupDiGetDevicePropertyW(set.0, info, key, &mut kind, None, Some(&mut size), 0) };
-    if size == 0 {
-        return None;
+/// Reads a device property into `buffer` (growing it when needed) and returns
+/// the filled part; `None` when the device doesn't have the property.
+fn property<'a>(devnode: u32, key: &DEVPROPKEY, buffer: &'a mut Vec<u8>) -> Option<&'a [u8]> {
+    loop {
+        let mut kind = DEVPROPTYPE::default();
+        let mut size = buffer.len() as u32;
+        // SAFETY: `size` is the capacity of `buffer`, which the call writes at most.
+        let cr = unsafe {
+            CM_Get_DevNode_PropertyW(
+                devnode,
+                key,
+                &mut kind,
+                Some(buffer.as_mut_ptr()),
+                &mut size,
+                0,
+            )
+        };
+        match cr {
+            CR_SUCCESS => return Some(&buffer[..size as usize]),
+            CR_BUFFER_SMALL => buffer.resize(size as usize, 0),
+            _ => return None,
+        }
     }
-    let mut buffer = vec![0u8; size as usize];
-    unsafe { SetupDiGetDevicePropertyW(set.0, info, key, &mut kind, Some(&mut buffer), None, 0) }
-        .ok()?;
-    Some(buffer)
-}
-
-fn instance_id(set: &DeviceInfoSet, info: &SP_DEVINFO_DATA) -> Option<String> {
-    let mut buffer = [0u16; 512];
-    // SAFETY: the buffer is larger than MAX_DEVICE_ID_LEN (200).
-    unsafe { SetupDiGetDeviceInstanceIdW(set.0, info, Some(&mut buffer), None) }.ok()?;
-    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-    Some(String::from_utf16_lossy(&buffer[..len]))
 }
 
 /// Splits a UTF-16LE (multi-)string property into its non-empty parts.

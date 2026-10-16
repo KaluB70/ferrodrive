@@ -23,7 +23,7 @@ pub fn scan() -> Result<Scan, Error> {
             version: dmi("bios_version"),
             release_date: dmi("bios_date"),
         },
-        devices: pci_devices()?,
+        devices: super::timed("devices", pci_devices)?,
     })
 }
 

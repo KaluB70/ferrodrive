@@ -14,8 +14,8 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[cfg(windows)]
-    #[error("Windows API error: {0}")]
-    Windows(#[from] ::windows::core::Error),
+    #[error("configuration manager error {0:#x}")]
+    ConfigManager(u32),
 }
 
 /// Scans this machine's firmware, system identity and devices.
@@ -26,6 +26,16 @@ pub fn scan() -> Result<Scan, Error> {
     return linux::scan();
     #[cfg(not(any(windows, target_os = "linux")))]
     Err(Error::Unsupported)
+}
+
+/// Runs `f`, printing how long it took to stderr when `FERRO_DEBUG` is set.
+fn timed<T>(step: &str, f: impl FnOnce() -> T) -> T {
+    let started = std::time::Instant::now();
+    let result = f();
+    if std::env::var_os("FERRO_DEBUG").is_some() {
+        eprintln!("ferro: {step} took {:.1?}", started.elapsed());
+    }
+    result
 }
 
 /// Days since 1970-01-01 to a (year, month, day) civil date (Howard Hinnant's algorithm).
