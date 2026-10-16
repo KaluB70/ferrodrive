@@ -50,3 +50,29 @@ jobs:
           files: ferro.exe
           prerelease: ${{ contains(github.ref, '-') }}
           generate_release_notes: true
+
+  # Rolling prerelease so the latest Windows build is always at
+  # https://github.com/KaluB70/ferrodrive/releases/download/nightly/ferro.exe
+  nightly:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ferro-windows-latest
+          path: dist
+      - name: Move nightly tag to this commit
+        run: |
+          git tag -f nightly
+          git push -f origin nightly
+      - name: Publish nightly release
+        run: |
+          notes="Latest build of main ($(git rev-parse --short HEAD)). Not a stable release."
+          gh release view nightly >/dev/null 2>&1 \
+            || gh release create nightly --prerelease --title "Nightly" --notes "$notes"
+          gh release edit nightly --notes "$notes"
+          gh release upload nightly dist/ferro.exe --clobber
