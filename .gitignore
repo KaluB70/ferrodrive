@@ -1,1 +1,5 @@
 /target
+/crates/app/gen
+/ui/node_modules
+/ui/dist
+/ui/.angular

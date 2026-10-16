@@ -1,0 +1,227 @@
+{
+ "scan": {
+  "system": {
+   "manufacturer": "LENOVO",
+   "product": "20354",
+   "version": "Lenovo Z50-70",
+   "sku": null,
+   "family": null,
+   "board_manufacturer": "LENOVO",
+   "board_product": "Lancer 5A5"
+  },
+  "firmware": {
+   "vendor": "LENOVO",
+   "version": "9BCN25WW",
+   "release_date": "2014-04-10"
+  },
+  "devices": [
+   {
+    "instance_id": "SAMPLE\\0",
+    "name": "Kaiuttimet (Conexant SmartAudio HD)",
+    "class": "AudioEndpoint",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.0.26100.1",
+     "date": "2024-03-31",
+     "provider": "Microsoft",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\1",
+    "name": "Broadcom Bluetooth 4.0",
+    "class": "Bluetooth",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "12.0.1.750",
+     "date": "2015-09-23",
+     "provider": "Broadcom",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\2",
+    "name": "Intel(R) HD Graphics Family",
+    "class": "Display",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "20.19.15.4642",
+     "date": "2017-03-28",
+     "provider": "Intel Corporation",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\3",
+    "name": "NVIDIA GeForce 840M",
+    "class": "Display",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "21.21.13.7667",
+     "date": "2017-01-15",
+     "provider": "NVIDIA",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\4",
+    "name": "ST1000LM014-SSHD-8GB",
+    "class": "DiskDrive",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.0.26100.9711",
+     "date": "2006-06-21",
+     "provider": "Microsoft",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\5",
+    "name": "Lenovo EasyCamera",
+    "class": "Image",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.0.10586.11193",
+     "date": "2016-05-05",
+     "provider": "Realtek",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\6",
+    "name": "Conexant SmartAudio HD",
+    "class": "MEDIA",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "8.66.27.55",
+     "date": "2016-07-12",
+     "provider": "Conexant",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\7",
+    "name": "Synaptics Pointing Device",
+    "class": "Mouse",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "19.0.17.96",
+     "date": "2016-05-27",
+     "provider": "Synaptics",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\8",
+    "name": "Broadcom 802.11n Network Adapter",
+    "class": "Net",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "7.35.352.0",
+     "date": "2016-11-22",
+     "provider": "Broadcom",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\9",
+    "name": "Realtek PCIe GBE Family Controller",
+    "class": "Net",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.1.505.2015",
+     "date": "2015-05-05",
+     "provider": "Realtek",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\10",
+    "name": "Intel(R) Management Engine Interface",
+    "class": "System",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "11.0.0.1181",
+     "date": "2016-02-04",
+     "provider": "Intel",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\11",
+    "name": "Intel(R) 8 Series SMBus Controller - 9C22",
+    "class": "System",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.1.1.38",
+     "date": "2016-10-03",
+     "provider": "INTEL",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\12",
+    "name": "Realtek USB 2.0 Card Reader",
+    "class": "USB",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.0.10586.31222",
+     "date": "2016-02-16",
+     "provider": "Realtek Semiconduct Corp.",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\13",
+    "name": "Intel(R) USB 3.0 eXtensible Host Controller - 1.0 (Microsoft)",
+    "class": "USB",
+    "manufacturer": null,
+    "hardware_ids": [],
+    "driver": {
+     "version": "10.0.26100.9711",
+     "date": "2026-10-09",
+     "provider": "Microsoft",
+     "package": null
+    }
+   },
+   {
+    "instance_id": "SAMPLE\\nodriver",
+    "name": "Unknown device",
+    "class": null,
+    "manufacturer": null,
+    "hardware_ids": [
+     "ACPI\\VPC2004"
+    ],
+    "driver": null
+   }
+  ]
+ },
+ "report": {
+  "updates": [
+   {
+    "source": "Lenovo support (unofficial)",
+    "kind": "firmware",
+    "title": "BIOS Update for Windows 7 (32-bit, 64-bit), Windows 8 (64-bit) , Windows 8.1 (64-bit), Windows10 (64-bit) - Lenovo Z40-70, Z50-70",
+    "version": "9BCN91WW",
+    "date": "2015-09-24",
+    "url": "https://download.lenovo.com/consumer/mobiles/9bcn91ww.exe",
+    "device": null,
+    "installed": "9BCN25WW"
+   }
+  ],
+  "errors": []
+ }
+}

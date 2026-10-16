@@ -1,0 +1,25 @@
+[package]
+name = "ferrodrive-app"
+description = "Ferrodrive desktop app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ferrodrive"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+ferrodrive-core.workspace = true
+ferrodrive-cli = { path = "../cli" }
+serde.workspace = true
+tauri = { version = "2.11", features = [] }
+tauri-plugin-opener = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_System_Console"] }

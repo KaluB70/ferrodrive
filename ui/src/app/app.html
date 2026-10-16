@@ -1,0 +1,133 @@
+<header class="topbar">
+  <div class="brand">
+    <img src="logo.svg" alt="" width="28" height="28" />
+    <span>Ferrodrive</span>
+  </div>
+  <button class="primary" type="button" (click)="runCheck()" [disabled]="checkPhase() === 'busy' || scanPhase() === 'busy'">
+    @if (checkPhase() === 'busy') {
+      <span class="spinner" aria-hidden="true"></span> Checking…
+    } @else {
+      Check for updates
+    }
+  </button>
+</header>
+
+<main>
+  @if (error(); as message) {
+    <p class="banner error" role="alert">{{ message }}</p>
+  }
+
+  <section class="machine" aria-label="This computer">
+    @if (scan(); as s) {
+      <div class="machine-main">
+        <p class="eyebrow">{{ s.system.manufacturer ?? 'Unknown manufacturer' }}</p>
+        <h1>{{ s.system.version ?? s.system.product ?? 'This computer' }}</h1>
+        @if (s.system.version && s.system.product) {
+          <p class="muted">Type {{ s.system.product }}</p>
+        }
+      </div>
+      <dl class="facts">
+        <div>
+          <dt>BIOS</dt>
+          <dd>{{ s.firmware.version ?? '–' }}</dd>
+          <dd class="muted">{{ s.firmware.release_date ?? '' }}</dd>
+        </div>
+        <div>
+          <dt>Board</dt>
+          <dd>{{ s.system.board_product ?? '–' }}</dd>
+          <dd class="muted">{{ s.system.board_manufacturer ?? '' }}</dd>
+        </div>
+        <div>
+          <dt>Devices</dt>
+          <dd>{{ s.devices.length }}</dd>
+          <dd class="muted">detected</dd>
+        </div>
+      </dl>
+    } @else if (scanPhase() === 'busy') {
+      <p class="muted"><span class="spinner" aria-hidden="true"></span> Scanning hardware…</p>
+    }
+  </section>
+
+  <section class="updates" aria-labelledby="updates-title">
+    <h2 id="updates-title">Updates</h2>
+    @switch (checkPhase()) {
+      @case ('idle') {
+        <p class="empty">Check Windows Update and your manufacturer's catalog for newer drivers and BIOS.</p>
+      }
+      @case ('busy') {
+        <p class="empty"><span class="spinner" aria-hidden="true"></span> Asking Windows Update and vendor catalogs. This can take a minute.</p>
+      }
+      @default {
+        @for (update of updates(); track $index) {
+          <article class="update">
+            <span class="kind" [class.firmware]="update.kind === 'firmware'">{{ update.kind === 'firmware' ? 'BIOS' : 'Driver' }}</span>
+            <div class="update-body">
+              <h3>{{ update.title }}</h3>
+              <p class="muted">
+                @if (deviceName(update.device); as name) {
+                  {{ name }} ·
+                }
+                {{ update.source }}
+                @if (update.date) {
+                  · {{ update.date }}
+                }
+              </p>
+              <p class="versions">
+                <span>{{ update.installed ?? 'not installed' }}</span>
+                <span class="arrow" aria-label="to">→</span>
+                <strong>{{ update.version ?? 'newer version' }}</strong>
+              </p>
+            </div>
+            @if (update.url; as url) {
+              <button type="button" (click)="open(url)">Download</button>
+            }
+          </article>
+        } @empty {
+          <p class="empty ok">Everything is up to date.</p>
+        }
+        @for (failure of report()?.errors ?? []; track failure.source) {
+          <p class="banner warn">{{ failure.source }} couldn't be checked: {{ failure.message }}</p>
+        }
+      }
+    }
+  </section>
+
+  <section class="devices" aria-labelledby="devices-title">
+    <div class="devices-head">
+      <h2 id="devices-title">Devices</h2>
+      <input type="search" placeholder="Search devices" aria-label="Search devices" [value]="query()" (input)="onQuery($event)" />
+      <label class="toggle">
+        <input type="checkbox" [checked]="showAll()" (change)="onShowAll($event)" />
+        Include devices without a driver
+      </label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Device</th>
+            <th scope="col">Driver</th>
+            <th scope="col">Date</th>
+            <th scope="col">Provider</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (device of devices(); track device.instance_id) {
+            <tr [class.has-update]="updatedDevices().has(device.instance_id)">
+              <td class="muted">{{ device.class ?? '–' }}</td>
+              <td>{{ device.name ?? device.hardware_ids[0] ?? device.instance_id }}</td>
+              <td class="mono">{{ device.driver?.version ?? '–' }}</td>
+              <td class="mono">{{ device.driver?.date ?? '–' }}</td>
+              <td class="muted">{{ device.driver?.provider ?? '–' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="empty">No devices match.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
