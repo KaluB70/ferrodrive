@@ -18,23 +18,26 @@ jobs:
             }
           }
           function Cab($url, $out) { Invoke-WebRequest -UseBasicParsing $url -OutFile "$out.cab"; expand.exe "$out.cab" "$out.xml" | Out-Null; Get-Content "$out.xml" -Raw }
-          # ThinkPad: catalog + first two package descriptors
-          try {
-            $c = [xml](Invoke-WebRequest -UseBasicParsing 'https://download.lenovo.com/catalog/20QD_Win10.xml').Content.TrimStart([char]0xFEFF)
-            $locs = $c.packages.package | % location
-            foreach ($l in ($locs | Select-Object -First 2)) { Note "tp-pkg" (Invoke-WebRequest -UseBasicParsing $l).Content }
-            $bios = $c.packages.package | ? { $_.category -like '*BIOS*' } | Select-Object -First 1
-            if ($bios) { Note "tp-bios" (Invoke-WebRequest -UseBasicParsing $bios.location).Content }
-            Note "tp-win11" ((Invoke-WebRequest -UseBasicParsing 'https://download.lenovo.com/catalog/20QD_Win11.xml').Content.Substring(0, 400))
-          } catch { Note 'tp-error' $_.ToString() }
           # HP: platform 8549 (EliteBook 840 G7) reference file
           try {
             $x = Cab 'https://hpia.hpcloud.hp.com/ref/8549/8549_64_11.0.23h2.cab' hp
-            Note 'hp-ref' $x.Substring(0, [Math]::Min(6000, $x.Length))
+            Note 'hp-ref' $x.Substring(0, [Math]::Min(6800, $x.Length))
             $i = $x.IndexOf('<Devices>'); if ($i -lt 0) { $i = $x.IndexOf('<Device>') }
             if ($i -ge 0) { Note 'hp-devices' $x.Substring($i, [Math]::Min(3000, $x.Length - $i)) }
             $j = $x.IndexOf('BIOS'); if ($j -ge 0) { Note 'hp-bios' $x.Substring([Math]::Max(0, $j - 1500), 3000) }
           } catch { Note 'hp-error' $_.ToString() }
+      - shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $script:n = 0
+          function Note($title, $text) {
+            $t = ($text -replace "`r","" -replace "%","%25" -replace "`n","%0A")
+            for ($i = 0; $i -lt $t.Length -and $i -lt 34000; $i += 3400) {
+              $part = $t.Substring($i, [Math]::Min(3400, $t.Length - $i))
+              Write-Output ("::notice title={0}-{1:D2}::{2}" -f $title, ($i / 3400), $part)
+            }
+          }
+          function Cab($url, $out) { Invoke-WebRequest -UseBasicParsing $url -OutFile "$out.cab"; expand.exe "$out.cab" "$out.xml" | Out-Null; Get-Content "$out.xml" -Raw }
           # Dell: index -> per-model catalog for Latitude 7420 (systemID 0A3D) or first model
           try {
             $idx = [xml](Cab 'https://downloads.dell.com/catalog/CatalogIndexPC.cab' dellidx)
@@ -43,6 +46,6 @@ jobs:
             Note 'dell-gm' $gm.OuterXml.Substring(0, [Math]::Min(3000, $gm.OuterXml.Length))
             $path = $gm.ManifestInformation.path
             $x = Cab "https://downloads.dell.com/$path" dellm
-            Note 'dell-model' $x.Substring(0, [Math]::Min(7000, $x.Length))
+            Note 'dell-model' $x.Substring(0, [Math]::Min(6800, $x.Length))
             $j = $x.IndexOf('componentType value="BIOS"'); if ($j -ge 0) { Note 'dell-bios' $x.Substring([Math]::Max(0, $j - 2500), 4000) }
           } catch { Note 'dell-error' $_.ToString() }
