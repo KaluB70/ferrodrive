@@ -1,0 +1,45 @@
+name: Probe
+on:
+  push:
+    branches: [probe]
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          function Note($title, $text) {
+            $t = ($text -replace "`r","" -replace "%","%25" -replace "`n","%0A")
+            if ($t.Length -gt 3500) { $t = $t.Substring(0,3500) }
+            Write-Output "::notice title=$title::$t"
+          }
+          $ua = @{ 'User-Agent' = 'Mozilla/5.0 Ferrodrive' }
+          try {
+            $p = Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://pcsupport.lenovo.com/us/en/api/v4/mse/getproducts?productId=20354'
+            Note 'lenovo-products' $p.Content
+            $id = ($p.Content | ConvertFrom-Json)[0].Id
+            $d = Invoke-WebRequest -UseBasicParsing -Headers $ua "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id"
+            Note 'lenovo-drivers-len' "$($d.Content.Length) $id"
+            Note 'lenovo-drivers-head' $d.Content.Substring(0, [Math]::Min(3500, $d.Content.Length))
+            $j = $d.Content | ConvertFrom-Json
+            Note 'lenovo-drivers-keys' (($j | Get-Member -MemberType NoteProperty | % Name) -join ',') 
+            Note 'lenovo-item' ($j.body.DownloadItems[0] | ConvertTo-Json -Depth 6)
+            Note 'lenovo-item2' ($j.body.DownloadItems[1] | ConvertTo-Json -Depth 6)
+          } catch { Note 'lenovo-error' $_.ToString() }
+          try {
+            $c = Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://download.lenovo.com/catalog/20QD_Win10.xml'
+            Note 'lenovo-catalog' $c.Content.Substring(0, [Math]::Min(3000, $c.Content.Length))
+          } catch { Note 'lenovo-catalog-error' $_.ToString() }
+          try {
+            Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://hpia.hpcloud.hp.com/ref/platformList.cab' -OutFile pl.cab
+            expand.exe pl.cab pl.xml | Out-Null
+            $x = Get-Content pl.xml -Raw
+            Note 'hp-platformlist' $x.Substring(0, [Math]::Min(3000, $x.Length))
+          } catch { Note 'hp-error' $_.ToString() }
+          try {
+            Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://downloads.dell.com/catalog/CatalogIndexPC.cab' -OutFile ci.cab
+            expand.exe ci.cab ci.xml | Out-Null
+            $x = Get-Content ci.xml -Raw
+            Note 'dell-index' $x.Substring(0, [Math]::Min(3000, $x.Length))
+          } catch { Note 'dell-error' $_.ToString() }
