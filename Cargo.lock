@@ -105,6 +105,7 @@ dependencies = [
  "clap",
  "ferrodrive-core",
  "serde_json",
+ "windows",
 ]
 
 [[package]]
