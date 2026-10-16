@@ -2,7 +2,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
-use ferrodrive_core::{Device, Scan, Update};
+use ferrodrive_core::{Device, Kind, Scan};
 
 /// Ferrodrive: find driver, BIOS and firmware updates for this machine.
 #[derive(Parser)]
@@ -24,7 +24,7 @@ enum Command {
         #[arg(long)]
         all: bool,
     },
-    /// Look up driver updates for this machine (Windows Update for now).
+    /// Look up driver and BIOS updates for this machine.
     Check {
         /// Print machine-readable JSON instead of a table.
         #[arg(long)]
@@ -94,84 +94,69 @@ fn scan(json: bool, all: bool) -> ExitCode {
 fn check(json: bool) -> ExitCode {
     let started = Instant::now();
     if !json {
-        println!("Searching Windows Update for drivers, this can take a minute...");
+        println!("Checking Windows Update and vendor sources, this can take a minute...");
     }
-    // The online search dominates; scan the hardware meanwhile.
-    let (scan, updates) = std::thread::scope(|scope| {
-        let updates = scope.spawn(ferrodrive_core::check);
-        let scan = ferrodrive_core::scan();
-        (scan, updates.join().expect("update search panicked"))
-    });
-    let (scan, updates) = match (scan, updates) {
-        (Ok(scan), Ok(updates)) => (scan, updates),
-        (Err(e), _) | (_, Err(e)) => {
-            eprintln!("ferro: check failed: {e}");
+    let scan = match ferrodrive_core::scan() {
+        Ok(scan) => scan,
+        Err(e) => {
+            eprintln!("ferro: scan failed: {e}");
             return ExitCode::FAILURE;
         }
     };
-
-    let matches: Vec<(Option<&Device>, &Update)> = updates
-        .iter()
-        .map(|update| (matching_device(&scan, update), update))
-        .collect();
+    let report = ferrodrive_core::check(&scan);
 
     if json {
-        let entries: Vec<_> = matches
-            .iter()
-            .map(|(device, update)| {
-                serde_json::json!({
-                    "update": update,
-                    "device": device.map(|d| &d.instance_id),
-                    "installed": device.and_then(|d| d.driver.as_ref()),
-                })
-            })
-            .collect();
         println!(
             "{}",
-            serde_json::to_string_pretty(&entries).unwrap_or_default()
+            serde_json::to_string_pretty(&report).unwrap_or_default()
         );
         return ExitCode::SUCCESS;
     }
 
-    if matches.is_empty() {
-        println!("\nNo driver updates offered. ({:.0?})", started.elapsed());
+    for error in &report.errors {
+        eprintln!("ferro: {} failed: {}", error.source, error.message);
+    }
+    if report.updates.is_empty() {
+        println!("\nNo updates found. ({:.0?})", started.elapsed());
         return ExitCode::SUCCESS;
     }
-    println!();
-    for (device, update) in &matches {
-        let installed = device
-            .and_then(|d| d.driver.as_ref())
-            .map(|d| {
-                format!(
-                    "{} ({})",
-                    d.version.as_deref().unwrap_or("-"),
-                    d.date.as_deref().unwrap_or("-")
-                )
-            })
-            .unwrap_or_else(|| "-".into());
-        println!("{}", update.title);
-        if let Some(device) = device {
-            println!(
-                "  device     {}",
-                device.name.as_deref().unwrap_or(&device.instance_id)
-            );
+    for update in &report.updates {
+        let target = match update.kind {
+            Kind::Firmware => Some("BIOS / firmware".to_owned()),
+            Kind::Driver => update.device.as_deref().map(|id| device_name(&scan, id)),
+        };
+        println!("\n{}", update.title);
+        println!("  source     {}", update.source);
+        if let Some(target) = target {
+            println!("  for        {target}");
         }
-        println!("  installed  {installed}");
         println!(
-            "  offered    {}",
-            update.driver_date.as_deref().unwrap_or("-")
+            "  installed  {}",
+            update.installed.as_deref().unwrap_or("-")
         );
+        println!(
+            "  offered    {} ({})",
+            update.version.as_deref().unwrap_or("-"),
+            update.date.as_deref().unwrap_or("-")
+        );
+        if let Some(url) = &update.url {
+            println!("  download   {url}");
+        }
     }
-    println!("\n{} updates in {:.0?}", matches.len(), started.elapsed());
+    println!(
+        "\n{} updates in {:.0?}",
+        report.updates.len(),
+        started.elapsed()
+    );
     ExitCode::SUCCESS
 }
 
-/// The device an update targets, matched on hardware id (case-insensitive).
-fn matching_device<'a>(scan: &'a Scan, update: &Update) -> Option<&'a Device> {
-    let id = update.hardware_id.as_deref()?;
+fn device_name(scan: &Scan, instance_id: &str) -> String {
     scan.devices
         .iter()
-        .find(|d| d.hardware_ids.iter().any(|h| h.eq_ignore_ascii_case(id)))
+        .find(|d| d.instance_id == instance_id)
+        .and_then(|d| d.name.clone())
+        .unwrap_or_else(|| instance_id.to_owned())
 }
 
 fn print_scan(scan: &Scan) {

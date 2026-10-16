@@ -24,6 +24,9 @@ pub fn parse(table: &[u8]) -> (System, Firmware) {
                 system.manufacturer = structure.string_at(0x04);
                 system.product = structure.string_at(0x05);
                 system.version = structure.string_at(0x06);
+                // SMBIOS 2.4+ only; older tables are shorter and yield None.
+                system.sku = structure.string_at(0x19);
+                system.family = structure.string_at(0x1a);
             }
             TYPE_BASEBOARD => {
                 system.board_manufacturer = structure.string_at(0x04);

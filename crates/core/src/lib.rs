@@ -8,4 +8,4 @@ pub mod updates;
 
 pub use detect::{Error, scan};
 pub use model::{Device, Driver, Firmware, Scan, System};
-pub use updates::{Update, check};
+pub use updates::{Kind, Report, Update, check};

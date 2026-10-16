@@ -14,6 +14,9 @@ pub struct System {
     pub manufacturer: Option<String>,
     pub product: Option<String>,
     pub version: Option<String>,
+    /// SKU number; Dell uses it as the system id of its catalogs.
+    pub sku: Option<String>,
+    pub family: Option<String>,
     pub board_manufacturer: Option<String>,
     pub board_product: Option<String>,
 }

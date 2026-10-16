@@ -7,12 +7,18 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::UpdateAgent::{IUpdateSession, IWindowsDriverUpdate, UpdateSession};
 use windows::core::{BSTR, Interface};
 
-use super::Update;
-use crate::detect::Error;
+use super::{Kind, Update};
+use crate::model::Scan;
+
+pub const NAME: &str = "Windows Update";
 
 const CRITERIA: &str = "IsInstalled=0 and Type='Driver' and IsHidden=0";
 
-pub fn search() -> Result<Vec<Update>, Error> {
+pub fn search(scan: &Scan) -> Result<Vec<Update>, String> {
+    query(scan).map_err(|e| e.to_string())
+}
+
+fn query(scan: &Scan) -> windows::core::Result<Vec<Update>> {
     // SAFETY: balanced with CoUninitialize when `_com` drops.
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok()?;
     let _com = ComGuard;
@@ -29,15 +35,24 @@ pub fn search() -> Result<Vec<Update>, Error> {
         for index in 0..found.Count()? {
             let update = found.get_Item(index)?;
             let mut entry = Update {
-                source: "Windows Update",
+                source: NAME,
+                kind: Kind::Driver,
                 title: update.Title()?.to_string(),
-                ..Default::default()
+                version: None,
+                date: None,
+                url: None,
+                device: None,
+                installed: None,
             };
             if let Ok(driver) = update.cast::<IWindowsDriverUpdate>() {
-                entry.hardware_id = driver.DriverHardwareID().ok().map(|s| s.to_string());
-                entry.provider = driver.DriverProvider().ok().map(|s| s.to_string());
-                entry.class = driver.DriverClass().ok().map(|s| s.to_string());
-                entry.driver_date = driver.DriverVerDate().ok().and_then(ole_date);
+                entry.date = driver.DriverVerDate().ok().and_then(ole_date);
+                let hardware_id = driver.DriverHardwareID().ok().map(|s| s.to_string());
+                if let Some(device) =
+                    hardware_id.and_then(|id| super::device_with_hardware_id(scan, &id))
+                {
+                    entry.device = Some(device.instance_id.clone());
+                    entry.installed = device.driver.as_ref().and_then(|d| d.version.clone());
+                }
             }
             updates.push(entry);
         }

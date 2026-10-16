@@ -1,0 +1,48 @@
+{
+  "message": "succeed",
+  "body": {
+    "DownloadItems": [
+      {
+        "Title": "Touchpad Driver (Elan, Synaptics) for Windows 10 (64-bit) - Lenovo Z40-70, Z50-70",
+        "Category": { "Name": "Mouse, Touchpad, Keyboard and Pen" },
+        "OperatingSystemKeys": ["Windows 10 (64-bit)"],
+        "Files": [
+          { "TypeString": "EXE", "Version": "ELAN_11.4.94.1_Synaptics_19.0.16.0", "URL": "https://download.lenovo.com/consumer/mobiles/2ulc01af.exe", "Date": { "Unix": 1446768000000 } }
+        ]
+      },
+      {
+        "Title": "BIOS Update for Windows 7 (32-bit, 64-bit), Windows 8 (64-bit) , Windows 8.1 (64-bit), Windows10 (64-bit) - Lenovo Z40-70, Z50-70",
+        "Category": { "Name": "BIOS/UEFI" },
+        "OperatingSystemKeys": ["Windows 7 (32-bit)", "Windows 7 (64-bit)", "Windows 8 (64-bit)", "Windows 8.1 (64-bit)", "Windows 10 (64-bit)"],
+        "Files": [
+          { "TypeString": "TXT README", "Version": "91", "URL": "https://download.lenovo.com/consumer/mobiles/9bcn91ww.txt", "Date": { "Unix": 1443052800000 } },
+          { "TypeString": "EXE", "Version": "91", "URL": "https://download.lenovo.com/consumer/mobiles/9bcn91ww.exe", "Date": { "Unix": 1443052800000 } }
+        ]
+      },
+      {
+        "Title": "Intel VGA Driver for Windows 10 (64-bit) - Lenovo Z40-70, Z50-70",
+        "Category": { "Name": "Display and Video Graphics" },
+        "OperatingSystemKeys": ["Windows 10 (64-bit)"],
+        "Files": [
+          { "TypeString": "EXE", "Version": "20.19.15.4474_WHQL", "URL": "https://download.lenovo.com/consumer/mobiles/2ul101af.exe", "Date": { "Unix": 1460000000000 } }
+        ]
+      },
+      {
+        "Title": "Audio Driver for Windows 10 (64-bit) - Lenovo Z40-70, Z50-70",
+        "Category": { "Name": "Audio" },
+        "OperatingSystemKeys": ["Windows 10 (64-bit)"],
+        "Files": [
+          { "TypeString": "EXE", "Version": "8.66.27.55_WHQL", "URL": "https://download.lenovo.com/consumer/mobiles/2ul301af.exe", "Date": { "Unix": 1460000000000 } }
+        ]
+      },
+      {
+        "Title": "Realtek Lan Driver for Windows 8.1 (64-bit) - Lenovo Z40-70, Z50-70",
+        "Category": { "Name": "Networking: LAN (Ethernet)" },
+        "OperatingSystemKeys": ["Windows 8.1 (64-bit)"],
+        "Files": [
+          { "TypeString": "EXE", "Version": "10.2.0.0", "URL": "https://download.lenovo.com/consumer/mobiles/old.exe", "Date": null }
+        ]
+      }
+    ]
+  }
+}

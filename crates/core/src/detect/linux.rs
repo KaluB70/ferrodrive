@@ -15,6 +15,8 @@ pub fn scan() -> Result<Scan, Error> {
             manufacturer: dmi("sys_vendor"),
             product: dmi("product_name"),
             version: dmi("product_version"),
+            sku: dmi("product_sku"),
+            family: dmi("product_family"),
             board_manufacturer: dmi("board_vendor"),
             board_product: dmi("board_name"),
         },
