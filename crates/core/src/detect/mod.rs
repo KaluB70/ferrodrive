@@ -28,11 +28,59 @@ pub fn scan() -> Result<Scan, Error> {
     Err(Error::Unsupported)
 }
 
+fn debug_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("FERRO_DEBUG").is_some())
+}
+
+/// Cumulative per-step timings across threads, printed with `FERRO_DEBUG`.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod profile {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    static TOTALS: Mutex<Vec<(&'static str, Duration, u32)>> = Mutex::new(Vec::new());
+
+    pub struct Timer(Option<(&'static str, Instant)>);
+
+    impl Timer {
+        pub fn start(name: &'static str) -> Self {
+            Self(super::debug_enabled().then(|| (name, Instant::now())))
+        }
+    }
+
+    impl Drop for Timer {
+        fn drop(&mut self) {
+            let Some((name, started)) = self.0 else {
+                return;
+            };
+            let elapsed = started.elapsed();
+            let mut totals = TOTALS.lock().unwrap_or_else(|e| e.into_inner());
+            match totals.iter_mut().find(|(n, ..)| *n == name) {
+                Some((_, total, calls)) => {
+                    *total += elapsed;
+                    *calls += 1;
+                }
+                None => totals.push((name, elapsed, 1)),
+            }
+        }
+    }
+
+    /// Prints the totals, slowest first. Times are summed over all threads.
+    pub fn report() {
+        let mut totals = TOTALS.lock().unwrap_or_else(|e| e.into_inner());
+        totals.sort_by_key(|&(_, total, _)| std::cmp::Reverse(total));
+        for (name, total, calls) in totals.drain(..) {
+            eprintln!("ferro:   {name:<16} {total:>10.1?} over {calls} calls");
+        }
+    }
+}
+
 /// Runs `f`, printing how long it took to stderr when `FERRO_DEBUG` is set.
 fn timed<T>(step: &str, f: impl FnOnce() -> T) -> T {
     let started = std::time::Instant::now();
     let result = f();
-    if std::env::var_os("FERRO_DEBUG").is_some() {
+    if debug_enabled() {
         eprintln!("ferro: {step} took {:.1?}", started.elapsed());
     }
     result

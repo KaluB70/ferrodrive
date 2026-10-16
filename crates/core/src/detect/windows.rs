@@ -56,24 +56,41 @@ fn smbios_table() -> Option<Vec<u8>> {
 
 fn devices() -> Result<Vec<Device>, Error> {
     let ids = device_ids()?;
-    let mut buffer = vec![0u8; 4096];
-    let mut devices = Vec::with_capacity(ids.len());
-    for id in ids {
-        let mut devnode = 0u32;
-        let id_wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
-        // SAFETY: `id_wide` is a NUL-terminated device instance id.
-        let located = unsafe {
-            CM_Locate_DevNodeW(
-                &mut devnode,
-                PCWSTR(id_wide.as_ptr()),
-                CM_LOCATE_DEVNODE_NORMAL,
-            )
-        };
-        if located == CR_SUCCESS {
-            devices.push(device(devnode, id, &mut buffer));
-        }
-    }
+    // Property reads are independent per device, so spread them over all cores.
+    let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let chunk = ids.len().div_ceil(workers).max(1);
+    let devices = std::thread::scope(|scope| {
+        let handles: Vec<_> = ids
+            .chunks(chunk)
+            .map(|ids| {
+                scope.spawn(move || ids.iter().filter_map(|id| locate(id)).collect::<Vec<_>>())
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap_or_default())
+            .collect()
+    });
+    super::profile::report();
     Ok(devices)
+}
+
+fn locate(id: &str) -> Option<Device> {
+    thread_local! {
+        static BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(vec![0u8; 4096]);
+    }
+    let mut devnode = 0u32;
+    let id_wide: Vec<u16> = id.encode_utf16().chain(Some(0)).collect();
+    // SAFETY: `id_wide` is a NUL-terminated device instance id.
+    let located = unsafe {
+        CM_Locate_DevNodeW(
+            &mut devnode,
+            PCWSTR(id_wide.as_ptr()),
+            CM_LOCATE_DEVNODE_NORMAL,
+        )
+    };
+    (located == CR_SUCCESS)
+        .then(|| BUFFER.with_borrow_mut(|buffer| device(devnode, id.to_owned(), buffer)))
 }
 
 /// Instance ids of all present devices, in one call to the configuration manager.
@@ -104,20 +121,33 @@ fn device_ids() -> Result<Vec<String>, Error> {
 }
 
 fn device(devnode: u32, instance_id: String, buffer: &mut Vec<u8>) -> Device {
-    let mut string = |key| {
-        property(devnode, key, buffer)
+    let mut string = |name, key| {
+        property(devnode, name, key, buffer)
             .and_then(|raw| wide_strings(raw).next())
             .filter(|s| !s.is_empty())
     };
 
-    let version = string(&DEVPKEY_Device_DriverVersion);
-    let provider = string(&DEVPKEY_Device_DriverProvider);
-    let package = string(&DEVPKEY_Device_DriverInfPath);
-    let name = string(&DEVPKEY_Device_FriendlyName).or_else(|| string(&DEVPKEY_Device_DeviceDesc));
-    let class = string(&DEVPKEY_Device_Class);
-    let manufacturer = string(&DEVPKEY_Device_Manufacturer);
-    let date = property(devnode, &DEVPKEY_Device_DriverDate, buffer).and_then(filetime_to_date);
-    let hardware_ids = property(devnode, &DEVPKEY_Device_HardwareIds, buffer)
+    let name = string("FriendlyName", &DEVPKEY_Device_FriendlyName)
+        .or_else(|| string("DeviceDesc", &DEVPKEY_Device_DeviceDesc));
+    let class = string("Class", &DEVPKEY_Device_Class);
+    let manufacturer = string("Manufacturer", &DEVPKEY_Device_Manufacturer);
+    // Devices without a driver have none of the driver properties; skip those reads.
+    let driver = match string("DriverVersion", &DEVPKEY_Device_DriverVersion) {
+        Some(version) => {
+            let provider = string("DriverProvider", &DEVPKEY_Device_DriverProvider);
+            let package = string("DriverInfPath", &DEVPKEY_Device_DriverInfPath);
+            let date = property(devnode, "DriverDate", &DEVPKEY_Device_DriverDate, buffer)
+                .and_then(filetime_to_date);
+            Some(Driver {
+                version: Some(version),
+                date,
+                provider,
+                package,
+            })
+        }
+        None => None,
+    };
+    let hardware_ids = property(devnode, "HardwareIds", &DEVPKEY_Device_HardwareIds, buffer)
         .map(|raw| wide_strings(raw).collect())
         .unwrap_or_default();
 
@@ -127,18 +157,19 @@ fn device(devnode: u32, instance_id: String, buffer: &mut Vec<u8>) -> Device {
         class,
         manufacturer,
         hardware_ids,
-        driver: version.is_some().then_some(Driver {
-            version,
-            date,
-            provider,
-            package,
-        }),
+        driver,
     }
 }
 
 /// Reads a device property into `buffer` (growing it when needed) and returns
 /// the filled part; `None` when the device doesn't have the property.
-fn property<'a>(devnode: u32, key: &DEVPROPKEY, buffer: &'a mut Vec<u8>) -> Option<&'a [u8]> {
+fn property<'a>(
+    devnode: u32,
+    name: &'static str,
+    key: &DEVPROPKEY,
+    buffer: &'a mut Vec<u8>,
+) -> Option<&'a [u8]> {
+    let _timer = super::profile::Timer::start(name);
     loop {
         let mut kind = DEVPROPTYPE::default();
         let mut size = buffer.len() as u32;
