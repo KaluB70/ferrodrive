@@ -9,13 +9,16 @@ mod windows;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("hardware detection is not supported on this OS yet")]
+    #[error("this is not supported on this OS yet")]
     Unsupported,
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[cfg(windows)]
     #[error("configuration manager error {0:#x}")]
     ConfigManager(u32),
+    #[cfg(windows)]
+    #[error("Windows API error: {0}")]
+    Windows(#[from] ::windows::core::Error),
 }
 
 /// Scans this machine's firmware, system identity and devices.
@@ -77,7 +80,7 @@ mod profile {
 }
 
 /// Runs `f`, printing how long it took to stderr when `FERRO_DEBUG` is set.
-fn timed<T>(step: &str, f: impl FnOnce() -> T) -> T {
+pub(crate) fn timed<T>(step: &str, f: impl FnOnce() -> T) -> T {
     let started = std::time::Instant::now();
     let result = f();
     if debug_enabled() {
@@ -88,7 +91,7 @@ fn timed<T>(step: &str, f: impl FnOnce() -> T) -> T {
 
 /// Days since 1970-01-01 to a (year, month, day) civil date (Howard Hinnant's algorithm).
 #[cfg_attr(not(windows), allow(dead_code))]
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);

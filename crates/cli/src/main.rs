@@ -2,7 +2,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
-use ferrodrive_core::{Device, Scan};
+use ferrodrive_core::{Device, Scan, Update};
 
 /// Ferrodrive: find driver, BIOS and firmware updates for this machine.
 #[derive(Parser)]
@@ -24,12 +24,19 @@ enum Command {
         #[arg(long)]
         all: bool,
     },
+    /// Look up driver updates for this machine (Windows Update for now).
+    Check {
+        /// Print machine-readable JSON instead of a table.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let code = match cli.command {
         Some(Command::Scan { json, all }) => scan(json, all),
+        Some(Command::Check { json }) => check(json),
         None => scan(false, false),
     };
     if launched_from_explorer() {
@@ -82,6 +89,89 @@ fn scan(json: bool, all: bool) -> ExitCode {
         println!("\n{} devices in {:.0?}", scan.devices.len(), elapsed);
     }
     ExitCode::SUCCESS
+}
+
+fn check(json: bool) -> ExitCode {
+    let started = Instant::now();
+    if !json {
+        println!("Searching Windows Update for drivers, this can take a minute...");
+    }
+    // The online search dominates; scan the hardware meanwhile.
+    let (scan, updates) = std::thread::scope(|scope| {
+        let updates = scope.spawn(ferrodrive_core::check);
+        let scan = ferrodrive_core::scan();
+        (scan, updates.join().expect("update search panicked"))
+    });
+    let (scan, updates) = match (scan, updates) {
+        (Ok(scan), Ok(updates)) => (scan, updates),
+        (Err(e), _) | (_, Err(e)) => {
+            eprintln!("ferro: check failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let matches: Vec<(Option<&Device>, &Update)> = updates
+        .iter()
+        .map(|update| (matching_device(&scan, update), update))
+        .collect();
+
+    if json {
+        let entries: Vec<_> = matches
+            .iter()
+            .map(|(device, update)| {
+                serde_json::json!({
+                    "update": update,
+                    "device": device.map(|d| &d.instance_id),
+                    "installed": device.and_then(|d| d.driver.as_ref()),
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&entries).unwrap_or_default()
+        );
+        return ExitCode::SUCCESS;
+    }
+
+    if matches.is_empty() {
+        println!("\nNo driver updates offered. ({:.0?})", started.elapsed());
+        return ExitCode::SUCCESS;
+    }
+    println!();
+    for (device, update) in &matches {
+        let installed = device
+            .and_then(|d| d.driver.as_ref())
+            .map(|d| {
+                format!(
+                    "{} ({})",
+                    d.version.as_deref().unwrap_or("-"),
+                    d.date.as_deref().unwrap_or("-")
+                )
+            })
+            .unwrap_or_else(|| "-".into());
+        println!("{}", update.title);
+        if let Some(device) = device {
+            println!(
+                "  device     {}",
+                device.name.as_deref().unwrap_or(&device.instance_id)
+            );
+        }
+        println!("  installed  {installed}");
+        println!(
+            "  offered    {}",
+            update.driver_date.as_deref().unwrap_or("-")
+        );
+    }
+    println!("\n{} updates in {:.0?}", matches.len(), started.elapsed());
+    ExitCode::SUCCESS
+}
+
+/// The device an update targets, matched on hardware id (case-insensitive).
+fn matching_device<'a>(scan: &'a Scan, update: &Update) -> Option<&'a Device> {
+    let id = update.hardware_id.as_deref()?;
+    scan.devices
+        .iter()
+        .find(|d| d.hardware_ids.iter().any(|h| h.eq_ignore_ascii_case(id)))
 }
 
 fn print_scan(scan: &Scan) {

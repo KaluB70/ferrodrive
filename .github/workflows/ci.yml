@@ -32,6 +32,11 @@ jobs:
       - run: cargo build --release -p ferrodrive-cli
       - name: Smoke test
         run: target/release/${{ matrix.bin }} scan
+      - name: Smoke test check
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: target/release/${{ matrix.bin }} check
       - uses: actions/upload-artifact@v4
         with:
           name: ferro-${{ matrix.os }}
