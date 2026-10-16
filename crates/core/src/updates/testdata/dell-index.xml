@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-16"?>
+<ManifestIndex baseLocation="downloads.dell.com" version="2026.10.14" schemaVersion="3.0" xmlns="openmanage/cm/dm">
+  <GroupManifest type="MTPDK" id="17738a87-52e4-4b99-b445-a0bfc48fea41">
+    <Display lang="en"><![CDATA[ PDK Catalog for Inspiron Desktop INSPIRON 24-5488]]></Display>
+    <SupportedSystems>
+      <Brand key="26" prefix="INSDT">
+        <Model systemID="07E8" systemIDType="BIOS"><Display lang="en"><![CDATA[INSPIRON 24-5488]]></Display></Model>
+      </Brand>
+    </SupportedSystems>
+    <ManifestInformation id="dd0698b3" version="2026.08.30" path="FOLDER14968537M/1/Inspiron_Desktop_07E8.cab" />
+  </GroupManifest>
+</ManifestIndex>

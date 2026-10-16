@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImagePal>
+  <Platform>
+    <ProductName Id="6888266">HP 402 G1 Small Form Factor PC</ProductName>
+    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>1803</OSReleaseIdFilename><OSBuildId>17134</OSBuildId></OS>
+    <SystemID>0266</SystemID>
+  </Platform>
+  <Platform>
+    <ProductName Id="1">HP EliteBook 840 G6 Notebook PC</ProductName>
+    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>22H2</OSReleaseIdFilename><OSBuildId>19045</OSBuildId></OS>
+    <OS><OSVersion>11.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>24H2</OSReleaseIdFilename><OSBuildId>26100</OSBuildId></OS>
+    <OS><OSVersion>11.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>23H2</OSReleaseIdFilename><OSBuildId>22631</OSBuildId></OS>
+    <SystemID>8549</SystemID>
+  </Platform>
+</ImagePal>

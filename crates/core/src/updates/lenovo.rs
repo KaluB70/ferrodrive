@@ -25,7 +25,15 @@ pub fn applies(scan: &Scan) -> bool {
         && scan.system.product.is_some()
 }
 
+/// Lenovo's documented catalog for Think models, else the support site API.
 pub fn search(scan: &Scan) -> Result<Vec<Update>, String> {
+    if let Some(updates) = super::thinkpad::search(scan)? {
+        return Ok(updates);
+    }
+    support_api(scan)
+}
+
+fn support_api(scan: &Scan) -> Result<Vec<Update>, String> {
     let product = scan.system.product.as_deref().unwrap_or_default();
     let products: Vec<Product> = json(&format!("{API}/mse/getproducts?productId={product}"))?;
     let Some(product) = products.into_iter().next() else {

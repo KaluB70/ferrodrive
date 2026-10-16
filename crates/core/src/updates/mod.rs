@@ -4,11 +4,15 @@ use serde::Serialize;
 
 use crate::model::{Device, Scan};
 
+mod dell;
+mod hp;
 mod http;
 mod lenovo;
+mod thinkpad;
 pub mod version;
 #[cfg(windows)]
 mod windows_update;
+mod xml;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -55,7 +59,13 @@ pub fn check(scan: &Scan) -> Report {
     #[cfg(windows)]
     sources.push((windows_update::NAME, windows_update::search));
     if lenovo::applies(scan) {
-        sources.push((lenovo::NAME, lenovo::search));
+        sources.push(("Lenovo", lenovo::search));
+    }
+    if hp::applies(scan) {
+        sources.push((hp::NAME, hp::search));
+    }
+    if dell::applies(scan) {
+        sources.push((dell::NAME, dell::search));
     }
 
     let results: Vec<_> = std::thread::scope(|scope| {
@@ -79,11 +89,41 @@ pub fn check(scan: &Scan) -> Report {
             Err(message) => report.errors.push(SourceError { source, message }),
         }
     }
+    keep_newest(&mut report.updates);
     report
 }
 
+/// Catalogs often list several packages for one device; keep the newest per
+/// source, kind and device.
+fn keep_newest(updates: &mut Vec<Update>) {
+    let mut kept: Vec<Update> = Vec::with_capacity(updates.len());
+    for update in updates.drain(..) {
+        let same = kept.iter_mut().find(|k| {
+            k.source == update.source
+                && k.kind == update.kind
+                && k.device == update.device
+                && update.device.is_some()
+                || (k.source == update.source
+                    && k.kind == Kind::Firmware
+                    && update.kind == Kind::Firmware)
+        });
+        match same {
+            Some(k) => {
+                let newer = match (&update.version, &k.version) {
+                    (Some(a), Some(b)) => version::compare(a, b).is_gt(),
+                    _ => false,
+                };
+                if newer {
+                    *k = update;
+                }
+            }
+            None => kept.push(update),
+        }
+    }
+    *updates = kept;
+}
+
 /// The device with this hardware id (case-insensitive).
-#[cfg_attr(not(windows), allow(dead_code))]
 fn device_with_hardware_id<'a>(scan: &'a Scan, id: &str) -> Option<&'a Device> {
     scan.devices
         .iter()

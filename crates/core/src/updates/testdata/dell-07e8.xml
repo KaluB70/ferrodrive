@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-16"?>
+<Manifest baseLocation="downloads.dell.com" version="2026.08.30" xmlns="openmanage/cm/dm">
+  <SoftwareComponent schemaVersion="3.0" releaseID="MKHKR" vendorVersion="20.19.15.4483" dellVersion="A04" path="FOLDER03879317M/6/Intel-HD-Iris-Iris-Pro-Graphics-Driver_MKHKR_WIN_20.19.15.4483_A04_02.EXE" dateTime="2016-06-15T00:49:09-05:00">
+    <Name><Display lang="en"><![CDATA[Intel HD/Iris/Iris Pro Graphics Driver]]></Display></Name>
+    <ComponentType value="DRVR"><Display lang="en"><![CDATA[Driver]]></Display></ComponentType>
+    <Category value="VI"><Display lang="en"><![CDATA[Video]]></Display></Category>
+    <SupportedDevices>
+      <Device componentID="100644" embedded="false">
+        <PCIInfo deviceID="0406" vendorID="8086" subDeviceID="0604" subVendorID="1028" />
+        <PCIInfo deviceID="0416" vendorID="8086" subDeviceID="0604" subVendorID="1028" />
+      </Device>
+    </SupportedDevices>
+  </SoftwareComponent>
+  <SoftwareComponent schemaVersion="3.0" releaseID="XXXXX" vendorVersion="1.10.0" path="FOLDER1/1/Inspiron_24_5488_1.10.0.exe" dateTime="2020-01-10T00:00:00-05:00">
+    <Name><Display lang="en"><![CDATA[Inspiron 24 5488 System BIOS]]></Display></Name>
+    <ComponentType value="BIOS"><Display lang="en"><![CDATA[BIOS]]></Display></ComponentType>
+  </SoftwareComponent>
+</Manifest>

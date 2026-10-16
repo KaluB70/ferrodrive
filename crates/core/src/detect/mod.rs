@@ -24,11 +24,36 @@ pub enum Error {
 /// Scans this machine's firmware, system identity and devices.
 pub fn scan() -> Result<Scan, Error> {
     #[cfg(windows)]
-    return windows::scan();
+    let scan = windows::scan();
     #[cfg(target_os = "linux")]
-    return linux::scan();
+    let scan = linux::scan();
     #[cfg(not(any(windows, target_os = "linux")))]
-    Err(Error::Unsupported)
+    let scan: Result<Scan, Error> = Err(Error::Unsupported);
+    scan.map(pretend)
+}
+
+/// Testing aid: `FERRO_PRETEND=manufacturer|product|board|sku|bios` makes the
+/// scan report another machine's identity, so vendor catalogs can be exercised
+/// on any computer. Empty fields keep the detected value.
+fn pretend(mut scan: Scan) -> Scan {
+    let Some(value) = std::env::var_os("FERRO_PRETEND") else {
+        return scan;
+    };
+    let value = value.to_string_lossy().into_owned();
+    let mut fields = value
+        .split('|')
+        .map(|f| (!f.is_empty()).then(|| f.to_owned()));
+    let mut set = |target: &mut Option<String>| {
+        if let Some(Some(v)) = fields.next() {
+            *target = Some(v);
+        }
+    };
+    set(&mut scan.system.manufacturer);
+    set(&mut scan.system.product);
+    set(&mut scan.system.board_product);
+    set(&mut scan.system.sku);
+    set(&mut scan.firmware.version);
+    scan
 }
 
 fn debug_enabled() -> bool {

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ImagePal>
+  <SystemInfo>
+    <System>
+      <SystemID>8549</SystemID>
+      <BiosVersion2>R70 Ver. 01.36.00</BiosVersion2>
+      <Solutions>
+        <UpdateInfo IdRef="sp174025" BiosDate="06/13/2026" />
+      </Solutions>
+    </System>
+  </SystemInfo>
+  <Devices>
+    <Device>
+      <ClassName>HIDClass</ClassName>
+      <FriendlyName>HP Wireless Button Driver</FriendlyName>
+      <DeviceId>ACPI\HPQ6001</DeviceId>
+      <DriverProvider>HP Inc.</DriverProvider>
+      <DriverDate>10/23/2025</DriverDate>
+      <DriverVersion>2.1.17.7</DriverVersion>
+      <Solutions>
+        <UpdateInfo IdRef="sp173624" />
+      </Solutions>
+    </Device>
+    <Device>
+      <ClassName>System</ClassName>
+      <DeviceId>ACPI\HPIC0003</DeviceId>
+      <DriverVersion>1.1.377.0</DriverVersion>
+      <Solutions>
+        <UpdateInfo IdRef="sp95222" />
+      </Solutions>
+    </Device>
+  </Devices>
+  <Solutions>
+    <UpdateInfo>
+      <Id>sp173624</Id>
+      <Name>HP Wireless Button Driver</Name>
+      <Category>Driver - Keyboard, Mouse and Input Devices</Category>
+      <Version>2.1.17.7 Rev.A</Version>
+      <Url>ftp.hp.com/pub/softpaq/sp173501-174000/sp173624.exe</Url>
+      <DateReleased>2025-11-04</DateReleased>
+    </UpdateInfo>
+    <UpdateInfo Supersedes="sp173290">
+      <Id>sp174025</Id>
+      <Name>HP BIOS and System Firmware (R70)</Name>
+      <Category>BIOS - System Firmware</Category>
+      <Version>01.36.00</Version>
+      <Url>ftp.hp.com/pub/softpaq/sp174001-174500/sp174025.exe</Url>
+      <DateReleased>2026-08-06</DateReleased>
+    </UpdateInfo>
+  </Solutions>
+</ImagePal>
