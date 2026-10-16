@@ -15,18 +15,24 @@ jobs:
             Write-Output "::notice title=$title::$t"
           }
           $ua = @{ 'User-Agent' = 'Mozilla/5.0 Ferrodrive' }
-          try {
-            $p = Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://pcsupport.lenovo.com/us/en/api/v4/mse/getproducts?productId=20354'
-            Note 'lenovo-products' $p.Content
-            $id = ($p.Content | ConvertFrom-Json)[0].Id
-            $d = Invoke-WebRequest -UseBasicParsing -Headers $ua "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id"
-            Note 'lenovo-drivers-len' "$($d.Content.Length) $id"
-            Note 'lenovo-drivers-head' $d.Content.Substring(0, [Math]::Min(3500, $d.Content.Length))
-            $j = $d.Content | ConvertFrom-Json
-            Note 'lenovo-drivers-keys' (($j | Get-Member -MemberType NoteProperty | % Name) -join ',') 
-            Note 'lenovo-item' ($j.body.DownloadItems[0] | ConvertTo-Json -Depth 6)
-            Note 'lenovo-item2' ($j.body.DownloadItems[1] | ConvertTo-Json -Depth 6)
-          } catch { Note 'lenovo-error' $_.ToString() }
+          $id = 'LAPTOPS-AND-NETBOOKS/LENOVO-Z-SERIES-LAPTOPS/LENOVO-Z50-70/20354'
+          $variants = @(
+            @{ n='plain'; h=$ua; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" },
+            @{ n='referer'; h=@{ 'User-Agent'='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'; 'Referer'="https://pcsupport.lenovo.com/us/en/products/$($id.ToLower())/downloads/driver-list"; 'Accept'='application/json, text/plain, */*'; 'X-Requested-With'='XMLHttpRequest' }; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" },
+            @{ n='lower'; h=$ua; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$($id.ToLower())" },
+            @{ n='ww'; h=$ua; u="https://pcsupport.lenovo.com/ww/en/api/v4/downloads/drivers?productId=$id" }
+          )
+          foreach ($v in $variants) {
+            try {
+              $d = Invoke-WebRequest -UseBasicParsing -Headers $v.h $v.u
+              Note "lenovo-$($v.n)" "$($d.StatusCode) len=$($d.Content.Length) $($d.Content.Substring(0, [Math]::Min(300, $d.Content.Length)))"
+              $j = $d.Content | ConvertFrom-Json
+              if ($j.body.DownloadItems) {
+                Note "lenovo-$($v.n)-item" ($j.body.DownloadItems[0] | ConvertTo-Json -Depth 6)
+                Note "lenovo-$($v.n)-titles" (($j.body.DownloadItems | % { "$($_.Title) | $($_.Category.Name)" }) -join "`n")
+              }
+            } catch { Note "lenovo-$($v.n)-error" $_.ToString() }
+          }
           try {
             $c = Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://download.lenovo.com/catalog/20QD_Win10.xml'
             Note 'lenovo-catalog' $c.Content.Substring(0, [Math]::Min(3000, $c.Content.Length))
