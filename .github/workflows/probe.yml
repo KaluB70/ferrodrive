@@ -9,50 +9,40 @@ jobs:
       - shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
+          $script:n = 0
           function Note($title, $text) {
             $t = ($text -replace "`r","" -replace "%","%25" -replace "`n","%0A")
-            if ($t.Length -gt 3500) { $t = $t.Substring(0,3500) }
-            Write-Output "::notice title=$title::$t"
+            for ($i = 0; $i -lt $t.Length -and $i -lt 34000; $i += 3400) {
+              $part = $t.Substring($i, [Math]::Min(3400, $t.Length - $i))
+              Write-Output ("::notice title={0}-{1:D2}::{2}" -f $title, ($i / 3400), $part)
+            }
           }
-          $ua = @{ 'User-Agent' = 'Mozilla/5.0 Ferrodrive' }
-          $id = 'LAPTOPS-AND-NETBOOKS/LENOVO-Z-SERIES-LAPTOPS/LENOVO-Z50-70/20354'
-          $variants = @(
-            @{ n='referer'; h=@{ 'User-Agent'='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'; 'Referer'='https://pcsupport.lenovo.com/' }; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" },
-            @{ n='refererfull'; h=@{ 'User-Agent'='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'; 'Referer'="https://pcsupport.lenovo.com/us/en/products/$($id.ToLower())/downloads/driver-list"; 'Accept'='application/json, text/plain, */*'; 'X-Requested-With'='XMLHttpRequest' }; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" }
-          )
-          $unused = @(
-            @{ n='plain'; h=$ua; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" },
-            @{ n='referer'; h=@{ 'User-Agent'='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'; 'Referer'="https://pcsupport.lenovo.com/us/en/products/$($id.ToLower())/downloads/driver-list"; 'Accept'='application/json, text/plain, */*'; 'X-Requested-With'='XMLHttpRequest' }; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" },
-            @{ n='lower'; h=$ua; u="https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$($id.ToLower())" },
-            @{ n='ww'; h=$ua; u="https://pcsupport.lenovo.com/ww/en/api/v4/downloads/drivers?productId=$id" }
-          )
-          foreach ($v in $variants) {
-            try {
-              $d = Invoke-WebRequest -UseBasicParsing -Headers $v.h $v.u
-              Note "lenovo-$($v.n)" "$($d.StatusCode) len=$($d.Content.Length) $($d.Content.Substring(0, [Math]::Min(300, $d.Content.Length)))"
-              $j = $d.Content | ConvertFrom-Json
-              if ($j.body.DownloadItems) {
-                $lines = $j.body.DownloadItems | % { "$($_.Title) | $($_.Category.Name) | $($_.OperatingSystemKeys -join ';') | " + (($_.Files | ? { $_.TypeString -ne 'HTML' -and $_.TypeString -ne 'TXT' } | % { "$($_.TypeString) $($_.Version) $($_.URL)" }) -join ' ; ') }
-                $all = $lines -join "`n"
-                for ($i = 0; $i -lt $all.Length; $i += 3400) { Note ("lenovo-items-{0:D2}" -f ($i / 3400)) $all.Substring($i, [Math]::Min(3400, $all.Length - $i)) }
-                $bios = $j.body.DownloadItems | ? { $_.Category.Name -eq 'BIOS/UEFI' } | Select-Object -First 1
-                if ($bios) { Note 'lenovo-bios-item' ($bios | ConvertTo-Json -Depth 6) }
-              }
-            } catch { Note "lenovo-$($v.n)-error" $_.ToString() }
-          }
+          function Cab($url, $out) { Invoke-WebRequest -UseBasicParsing $url -OutFile "$out.cab"; expand.exe "$out.cab" "$out.xml" | Out-Null; Get-Content "$out.xml" -Raw }
+          # ThinkPad: catalog + first two package descriptors
           try {
-            $c = Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://download.lenovo.com/catalog/20QD_Win10.xml'
-            Note 'lenovo-catalog' $c.Content.Substring(0, [Math]::Min(3000, $c.Content.Length))
-          } catch { Note 'lenovo-catalog-error' $_.ToString() }
+            $c = [xml](Invoke-WebRequest -UseBasicParsing 'https://download.lenovo.com/catalog/20QD_Win10.xml').Content.TrimStart([char]0xFEFF)
+            $locs = $c.packages.package | % location
+            foreach ($l in ($locs | Select-Object -First 2)) { Note "tp-pkg" (Invoke-WebRequest -UseBasicParsing $l).Content }
+            $bios = $c.packages.package | ? { $_.category -like '*BIOS*' } | Select-Object -First 1
+            if ($bios) { Note "tp-bios" (Invoke-WebRequest -UseBasicParsing $bios.location).Content }
+            Note "tp-win11" ((Invoke-WebRequest -UseBasicParsing 'https://download.lenovo.com/catalog/20QD_Win11.xml').Content.Substring(0, 400))
+          } catch { Note 'tp-error' $_.ToString() }
+          # HP: platform 8549 (EliteBook 840 G7) reference file
           try {
-            Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://hpia.hpcloud.hp.com/ref/platformList.cab' -OutFile pl.cab
-            expand.exe pl.cab pl.xml | Out-Null
-            $x = Get-Content pl.xml -Raw
-            Note 'hp-platformlist' $x.Substring(0, [Math]::Min(3000, $x.Length))
+            $x = Cab 'https://hpia.hpcloud.hp.com/ref/8549/8549_64_11.0.23h2.cab' hp
+            Note 'hp-ref' $x.Substring(0, [Math]::Min(6000, $x.Length))
+            $i = $x.IndexOf('<Devices>'); if ($i -lt 0) { $i = $x.IndexOf('<Device>') }
+            if ($i -ge 0) { Note 'hp-devices' $x.Substring($i, [Math]::Min(3000, $x.Length - $i)) }
+            $j = $x.IndexOf('BIOS'); if ($j -ge 0) { Note 'hp-bios' $x.Substring([Math]::Max(0, $j - 1500), 3000) }
           } catch { Note 'hp-error' $_.ToString() }
+          # Dell: index -> per-model catalog for Latitude 7420 (systemID 0A3D) or first model
           try {
-            Invoke-WebRequest -UseBasicParsing -Headers $ua 'https://downloads.dell.com/catalog/CatalogIndexPC.cab' -OutFile ci.cab
-            expand.exe ci.cab ci.xml | Out-Null
-            $x = Get-Content ci.xml -Raw
-            Note 'dell-index' $x.Substring(0, [Math]::Min(3000, $x.Length))
+            $idx = [xml](Cab 'https://downloads.dell.com/catalog/CatalogIndexPC.cab' dellidx)
+            $gm = $idx.ManifestIndex.GroupManifest | ? { $_.SupportedSystems.Brand.Model.systemID -contains '0A3D' } | Select-Object -First 1
+            if (-not $gm) { $gm = $idx.ManifestIndex.GroupManifest | Select-Object -First 1 }
+            Note 'dell-gm' $gm.OuterXml.Substring(0, [Math]::Min(3000, $gm.OuterXml.Length))
+            $path = $gm.ManifestInformation.path
+            $x = Cab "https://downloads.dell.com/$path" dellm
+            Note 'dell-model' $x.Substring(0, [Math]::Min(7000, $x.Length))
+            $j = $x.IndexOf('componentType value="BIOS"'); if ($j -ge 0) { Note 'dell-bios' $x.Substring([Math]::Max(0, $j - 2500), 4000) }
           } catch { Note 'dell-error' $_.ToString() }
