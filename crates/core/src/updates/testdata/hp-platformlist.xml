@@ -7,9 +7,9 @@
   </Platform>
   <Platform>
     <ProductName Id="1">HP EliteBook 840 G6 Notebook PC</ProductName>
-    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>22H2</OSReleaseIdFilename><OSBuildId>19045</OSBuildId></OS>
-    <OS><OSVersion>11.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>24H2</OSReleaseIdFilename><OSBuildId>26100</OSBuildId></OS>
-    <OS><OSVersion>11.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>23H2</OSReleaseIdFilename><OSBuildId>22631</OSBuildId></OS>
+    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>22H2</OSReleaseIdFilename><OSBuildId>19045</OSBuildId><IsWindows11>false</IsWindows11></OS>
+    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>24H2</OSReleaseIdFilename><OSBuildId>26100</OSBuildId><IsWindows11>true</IsWindows11></OS>
+    <OS><OSVersion>10.0</OSVersion><OSArchitecture>64</OSArchitecture><OSReleaseIdFilename>23H2</OSReleaseIdFilename><OSBuildId>22631</OSBuildId><IsWindows11>true</IsWindows11></OS>
     <SystemID>8549</SystemID>
   </Platform>
 </ImagePal>

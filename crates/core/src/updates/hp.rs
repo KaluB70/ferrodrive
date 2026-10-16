@@ -55,7 +55,13 @@ fn reference_file(list: &str, platform: &str) -> Result<Option<String>, String> 
         .filter(|os| xml::child_text(*os, "OSArchitecture").as_deref() == Some("64"))
         .filter_map(|os| {
             let build: u32 = xml::child_text(os, "OSBuildId")?.parse().ok()?;
-            let version = xml::child_text(os, "OSVersion")?;
+            // Windows 11 entries say OSVersion 10.0; the file name says 11.0.
+            let windows_11 = xml::child_text(os, "IsWindows11").as_deref() == Some("true");
+            let version = if windows_11 {
+                "11.0".to_owned()
+            } else {
+                xml::child_text(os, "OSVersion")?
+            };
             let release = xml::child_text(os, "OSReleaseIdFilename")?;
             Some((
                 build,
