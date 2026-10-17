@@ -39,8 +39,25 @@ fn support_api(scan: &Scan) -> Result<Vec<Update>, String> {
     let Some(product) = products.into_iter().next() else {
         return Err(format!("Lenovo doesn't know product {product}"));
     };
-    let drivers: Drivers = json(&format!("{API}/downloads/drivers?productId={}", product.id))?;
-    Ok(updates(scan, &drivers.body.download_items))
+    let url = format!("{API}/downloads/drivers?productId={}", product.id);
+    // The API sometimes answers with an empty body and a message instead of
+    // the list; asking again usually works.
+    let mut drivers: Drivers = json(&url)?;
+    if drivers.body.is_none() {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        drivers = json(&url)?;
+    }
+    match drivers.body {
+        Some(body) => Ok(updates(scan, &body.download_items)),
+        None => Err(format!(
+            "Lenovo didn't return a driver list ({})",
+            drivers
+                .message
+                .as_deref()
+                .filter(|m| !m.is_empty())
+                .unwrap_or("no reason given")
+        )),
+    }
 }
 
 fn json<T: for<'de> Deserialize<'de>>(url: &str) -> Result<T, String> {
@@ -198,7 +215,8 @@ struct Product {
 
 #[derive(Deserialize)]
 struct Drivers {
-    body: DriversBody,
+    body: Option<DriversBody>,
+    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -314,7 +332,7 @@ mod tests {
     #[test]
     fn offers_newer_bios_and_drivers_only() {
         let drivers: Drivers = serde_json::from_str(SAMPLE).unwrap();
-        let updates = updates(&scan(), &drivers.body.download_items);
+        let updates = updates(&scan(), &drivers.body.unwrap().download_items);
 
         let summary: Vec<_> = updates
             .iter()
@@ -332,5 +350,13 @@ mod tests {
             ]
         );
         assert_eq!(updates[1].date.as_deref(), Some("2015-09-24"));
+    }
+
+    #[test]
+    fn empty_body_keeps_the_message() {
+        let drivers: Drivers =
+            serde_json::from_str(r#"{"code":1,"message":"deny access","body":null}"#).unwrap();
+        assert!(drivers.body.is_none());
+        assert_eq!(drivers.message.as_deref(), Some("deny access"));
     }
 }

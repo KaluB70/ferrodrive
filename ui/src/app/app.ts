@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 
 import { FerrodriveService } from './ferrodrive.service';
-import type { Device, Report, Scan, Update } from './models';
+import type { Device, Report, Scan, SourceError, Update } from './models';
 
 type Phase = 'idle' | 'busy' | 'done' | 'failed';
 
@@ -34,6 +34,8 @@ export class App implements OnInit {
   });
 
   protected readonly updates = computed<readonly Update[]>(() => this.report()?.updates ?? []);
+
+  protected readonly failures = computed<readonly SourceError[]>(() => this.report()?.errors ?? []);
 
   protected readonly updatedDevices = computed<ReadonlySet<string>>(
     () => new Set(this.updates().flatMap((u: Update) => (u.device ? [u.device] : []))),
