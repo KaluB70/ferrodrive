@@ -25,10 +25,12 @@ jobs:
             'all'          = @{ 'Referer'='https://pcsupport.lenovo.com/us/en/'; 'Accept'='application/json, text/plain, */*'; 'User-Agent'=$browser; 'Accept-Language'='en-US,en;q=0.9'; 'X-Requested-With'='XMLHttpRequest' }
           }
           foreach ($k in $variants.Keys) {
+            $out = ''
             foreach ($try in 1..2) {
               try {
                 $r = Invoke-WebRequest -UseBasicParsing $url -Headers $variants[$k]
-                Note "$k-$try" ("HTTP " + $r.StatusCode + " len " + $r.Content.Length + " :: " + $r.Content.Substring(0, [Math]::Min(250, $r.Content.Length)))
-              } catch { Note "$k-$try-error" $_.ToString() }
+                $out += "[$try] HTTP " + $r.StatusCode + " len " + $r.Content.Length + " :: " + $r.Content.Substring(0, [Math]::Min(250, $r.Content.Length)) + "`n"
+              } catch { $out += "[$try] error " + $_.ToString().Substring(0, [Math]::Min(250, $_.ToString().Length)) + "`n" }
             }
+            Note $k $out
           }
