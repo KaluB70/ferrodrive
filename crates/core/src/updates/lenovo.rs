@@ -39,7 +39,12 @@ fn support_api(scan: &Scan) -> Result<Vec<Update>, String> {
     let Some(product) = products.into_iter().next() else {
         return Err(format!("Lenovo doesn't know product {product}"));
     };
-    let url = format!("{API}/downloads/drivers?productId={}", product.id);
+    // Since 2026-10 the API fails with "Cannot read property 'language' of
+    // undefined" unless the locale is also given as parameters.
+    let url = format!(
+        "{API}/downloads/drivers?productId={}&language=en&country=us",
+        product.id
+    );
     // The API sometimes answers with an empty body and a message instead of
     // the list; asking again usually works.
     let mut drivers: Drivers = json(&url)?;
