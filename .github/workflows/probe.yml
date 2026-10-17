@@ -14,23 +14,21 @@ jobs:
             Write-Output ("::notice title={0}::{1}" -f $title, $t.Substring(0, [Math]::Min(1500, $t.Length)))
           }
           $id = 'LAPTOPS-AND-NETBOOKS/LENOVO-Z-SERIES-LAPTOPS/LENOVO-Z50-70/20354'
-          $url = "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id"
-          $browser = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
-          $variants = [ordered]@{
-            'current'      = @{ 'Referer'='https://pcsupport.lenovo.com/'; 'Accept'='application/json'; 'User-Agent'='Ferrodrive/0.1.0' }
-            'lang-header'  = @{ 'Referer'='https://pcsupport.lenovo.com/'; 'Accept'='application/json'; 'User-Agent'='Ferrodrive/0.1.0'; 'Accept-Language'='en-US,en;q=0.9' }
-            'referer-usen' = @{ 'Referer'='https://pcsupport.lenovo.com/us/en/'; 'Accept'='application/json'; 'User-Agent'='Ferrodrive/0.1.0' }
-            'referer-prod' = @{ 'Referer'="https://pcsupport.lenovo.com/us/en/products/$($id.ToLower())/downloads/driver-list"; 'Accept'='application/json'; 'User-Agent'='Ferrodrive/0.1.0' }
-            'browser-ua'   = @{ 'Referer'='https://pcsupport.lenovo.com/'; 'Accept'='application/json'; 'User-Agent'=$browser; 'Accept-Language'='en-US,en;q=0.9' }
-            'all'          = @{ 'Referer'='https://pcsupport.lenovo.com/us/en/'; 'Accept'='application/json, text/plain, */*'; 'User-Agent'=$browser; 'Accept-Language'='en-US,en;q=0.9'; 'X-Requested-With'='XMLHttpRequest' }
+          $low = $id.ToLower()
+          $h = @{ 'Referer'='https://pcsupport.lenovo.com/'; 'Accept'='application/json' }
+          function Try1($name, $url, $session) {
+            try {
+              if ($session) { $r = Invoke-WebRequest -UseBasicParsing $url -Headers $h -WebSession $session } else { $r = Invoke-WebRequest -UseBasicParsing $url -Headers $h }
+              Note $name ("HTTP " + $r.StatusCode + " len " + $r.Content.Length + " :: " + $r.Content.Substring(0, [Math]::Min(600, $r.Content.Length)))
+            } catch { Note "$name-error" $_.ToString() }
           }
-          foreach ($k in $variants.Keys) {
-            $out = ''
-            foreach ($try in 1..2) {
-              try {
-                $r = Invoke-WebRequest -UseBasicParsing $url -Headers $variants[$k]
-                $out += "[$try] HTTP " + $r.StatusCode + " len " + $r.Content.Length + " :: " + $r.Content.Substring(0, [Math]::Min(250, $r.Content.Length)) + "`n"
-              } catch { $out += "[$try] error " + $_.ToString().Substring(0, [Math]::Min(250, $_.ToString().Length)) + "`n" }
-            }
-            Note $k $out
-          }
+          Try1 'getproducts' "https://pcsupport.lenovo.com/us/en/api/v4/mse/getproducts?productId=20354"
+          Try1 'lower' "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$low"
+          Try1 'nolocale' "https://pcsupport.lenovo.com/api/v4/downloads/drivers?productId=$id"
+          Try1 'ww-en' "https://pcsupport.lenovo.com/ww/en/api/v4/downloads/drivers?productId=$id"
+          Try1 'lang-param' "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id&language=en&country=us"
+          Try1 'downloadsv2' "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers/v2?productId=$id"
+          $s = $null
+          try { Invoke-WebRequest -UseBasicParsing "https://pcsupport.lenovo.com/us/en/products/$low/downloads/driver-list" -SessionVariable s | Out-Null; Note 'cookies' (($s.Cookies.GetCookies('https://pcsupport.lenovo.com') | % { $_.Name + '=' + $_.Value.Substring(0,[Math]::Min(40,$_.Value.Length)) }) -join '; ') } catch { Note 'page-error' $_.ToString() }
+          if ($s) { Try1 'with-cookies' "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$id" $s }
+          try { $p = Invoke-WebRequest -UseBasicParsing "https://pcsupport.lenovo.com/us/en/products/$low/downloads/driver-list"; $m = [regex]::Matches($p.Content, 'api/v\d/[A-Za-z/]+') | % Value | Sort-Object -Unique; Note 'page-apis' ($m -join "`n") } catch { Note 'page2-error' $_.ToString() }
